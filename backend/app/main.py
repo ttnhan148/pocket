@@ -60,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 def _register_routers(app: FastAPI) -> None:
     """Register all API routers."""
     from app.features.context.router import router as context_router
+    from app.features.dependency.router import router as dependency_router
     from app.features.health.router import router as health_router
     from app.features.tags_categories.router import (
         router as tags_categories_router,
@@ -69,6 +70,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(health_router, prefix="/api/v1", tags=["Health"])
     app.include_router(workspace_router, prefix="/api/v1/workspaces", tags=["Workspaces"])
     app.include_router(context_router, prefix="/api/v1/workspaces/{workspace_id}/contexts", tags=["Contexts"])
+    app.include_router(dependency_router, prefix="/api/v1/workspaces/{workspace_id}", tags=["Dependencies"])
     app.include_router(tags_categories_router, prefix="/api/v1/workspaces/{workspace_id}", tags=["Tags & Categories"])
 
 
