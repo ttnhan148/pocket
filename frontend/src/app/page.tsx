@@ -18,10 +18,10 @@ import {
   Cpu,
   Layers,
   ChevronDown,
+  ChevronRight,
   Clock,
   Sparkles,
   FileCode,
-  CheckCircle2,
   X,
   Sliders,
   ArrowLeft,
@@ -29,6 +29,9 @@ import {
   Check,
   Eye,
   History,
+  Tag as TagIcon,
+  FolderPlus,
+  FolderOpen,
 } from "lucide-react";
 import {
   fetchWorkspaces,
@@ -39,9 +42,16 @@ import {
   updateContext,
   deleteContext,
   fetchContextVersions,
+  fetchTags,
+  createTag,
+  fetchCategoriesTree,
+  createCategory,
+  deleteCategory,
   Workspace,
   Context,
   ContextVersion,
+  Tag,
+  CategoryTree,
 } from "@/lib/api";
 
 export default function Home() {
@@ -50,6 +60,8 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
 
   // View state: 'library' or 'editor'
   const [viewMode, setViewMode] = useState<"library" | "editor">("library");
@@ -62,11 +74,18 @@ export default function Home() {
   const [editorConfidence, setEditorConfidence] = useState(1.0);
   const [editorPinned, setEditorPinned] = useState(0);
   const [editorArchived, setEditorArchived] = useState(0);
+  const [editorCategoryId, setEditorCategoryId] = useState<string | null>(null);
+  const [editorTagIds, setEditorTagIds] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const [saveStatus, setSaveStatus] = useState<"saved" | "unsaved" | "saving">("saved");
+
+  // Collapsed categories state (mapping categoryId -> boolean)
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
   // Create Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isWsCreateOpen, setIsWsCreateOpen] = useState(false);
+  const [isCatCreateOpen, setIsCatCreateOpen] = useState(false);
 
   // New Context Form State
   const [newTitle, setNewTitle] = useState("");
@@ -74,10 +93,17 @@ export default function Home() {
   const [newType, setNewType] = useState("knowledge");
   const [newPriority, setNewPriority] = useState(50);
   const [newConfidence, setNewConfidence] = useState(1.0);
+  const [newCategoryId, setNewCategoryId] = useState("");
+  const [newTagIds, setNewTagIds] = useState<string[]>([]);
 
   // New Workspace Form State
   const [newWsName, setNewWsName] = useState("");
   const [newWsDesc, setNewWsDesc] = useState("");
+
+  // New Category Form State
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatDesc, setNewCatDesc] = useState("");
+  const [newCatParentId, setNewCatParentId] = useState("");
 
   // Debounce search query
   useEffect(() => {
@@ -101,19 +127,49 @@ export default function Home() {
     }
   }, [workspaces, activeWorkspaceId]);
 
+  // Query Tags
+  const { data: tags = [] } = useQuery<Tag[]>({
+    queryKey: ["tags", activeWorkspaceId],
+    queryFn: () => fetchTags(activeWorkspaceId),
+    enabled: !!activeWorkspaceId,
+  });
+
+  // Query Categories
+  const { data: categories = [] } = useQuery<CategoryTree[]>({
+    queryKey: ["categories", activeWorkspaceId],
+    queryFn: () => fetchCategoriesTree(activeWorkspaceId),
+    enabled: !!activeWorkspaceId,
+  });
+
   // Query Contexts
   const { data: contexts = [], isLoading } = useQuery<Context[]>({
-    queryKey: ["contexts", activeWorkspaceId, typeFilter, debouncedSearch],
+    queryKey: [
+      "contexts",
+      activeWorkspaceId,
+      typeFilter,
+      debouncedSearch,
+      selectedTagFilter,
+      selectedCategoryFilter,
+    ],
     queryFn: () => {
       if (debouncedSearch) {
         return searchContexts(activeWorkspaceId, debouncedSearch);
       }
       return fetchContexts(activeWorkspaceId, {
         context_type: typeFilter,
+        tag: selectedTagFilter,
       });
     },
     enabled: !!activeWorkspaceId,
   });
+
+  // Client-side filter for Category (database returns all, we filter by categoryId and its children)
+  const getFilteredContexts = () => {
+    if (!selectedCategoryFilter) return contexts;
+    return contexts.filter((c) => c.category_id === selectedCategoryFilter);
+  };
+
+  const filteredContexts = getFilteredContexts();
 
   // Query Context Version History (for editor sidebar)
   const { data: versionHistory = [] } = useQuery<ContextVersion[]>({
@@ -131,6 +187,8 @@ export default function Home() {
     setEditorConfidence(ctx.confidence);
     setEditorPinned(ctx.is_pinned);
     setEditorArchived(ctx.is_archived);
+    setEditorCategoryId(ctx.category_id);
+    setEditorTagIds(ctx.tags ? ctx.tags.map((t) => t.id) : []);
     setSaveStatus("saved");
     setViewMode("editor");
   };
@@ -144,12 +202,14 @@ export default function Home() {
       editorPriority !== editingContext.priority ||
       editorConfidence !== editingContext.confidence ||
       editorPinned !== editingContext.is_pinned ||
-      editorArchived !== editingContext.is_archived;
+      editorArchived !== editingContext.is_archived ||
+      editorCategoryId !== editingContext.category_id ||
+      JSON.stringify(editorTagIds.sort()) !== JSON.stringify((editingContext.tags || []).map((t) => t.id).sort());
 
     if (hasChanges && saveStatus === "saved") {
       setSaveStatus("unsaved");
     }
-  }, [editorTitle, editorContent, editorPriority, editorConfidence, editorPinned, editorArchived]);
+  }, [editorTitle, editorContent, editorPriority, editorConfidence, editorPinned, editorArchived, editorCategoryId, editorTagIds]);
 
   // Active Workspace Info
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
@@ -166,6 +226,22 @@ export default function Home() {
     },
   });
 
+  const createCategoryMutation = useMutation({
+    mutationFn: () =>
+      createCategory(activeWorkspaceId, {
+        name: newCatName,
+        description: newCatDesc || null,
+        parent_id: newCatParentId || null,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      setIsCatCreateOpen(false);
+      setNewCatName("");
+      setNewCatDesc("");
+      setNewCatParentId("");
+    },
+  });
+
   const createContextMutation = useMutation({
     mutationFn: () =>
       createContext(activeWorkspaceId, {
@@ -174,6 +250,8 @@ export default function Home() {
         context_type: newType,
         priority: newPriority,
         confidence: newConfidence,
+        category_id: newCategoryId || null,
+        tag_ids: newTagIds,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contexts"] });
@@ -183,6 +261,8 @@ export default function Home() {
       setNewType("knowledge");
       setNewPriority(50);
       setNewConfidence(1.0);
+      setNewCategoryId("");
+      setNewTagIds([]);
     },
   });
 
@@ -197,6 +277,8 @@ export default function Home() {
         confidence: editorConfidence,
         is_pinned: editorPinned,
         is_archived: editorArchived,
+        category_id: editorCategoryId,
+        tag_ids: editorTagIds,
       });
     },
     onSuccess: (updatedCtx) => {
@@ -208,6 +290,19 @@ export default function Home() {
     onError: () => {
       setSaveStatus("unsaved");
       alert("Failed to save changes.");
+    },
+  });
+
+  const createInlineTagMutation = useMutation({
+    mutationFn: (name: string) => createTag(activeWorkspaceId, name, "#10b981"),
+    onSuccess: (newTag) => {
+      queryClient.invalidateQueries({ queryKey: ["tags", activeWorkspaceId] });
+      if (viewMode === "editor") {
+        setEditorTagIds((prev) => [...prev, newTag.id]);
+      } else {
+        setNewTagIds((prev) => [...prev, newTag.id]);
+      }
+      setTagInput("");
     },
   });
 
@@ -227,11 +322,82 @@ export default function Home() {
     setSaveStatus("unsaved");
   };
 
+  // Toggle Category Collapsed state
+  const toggleCollapseCategory = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCollapsedCategories((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  // Categories Dropdown Flat Builder (collapses hierarchy into simple tree lookup for inputs)
+  const getFlatCategoriesList = (tree: CategoryTree[], depth = 0): { id: string; name: string }[] => {
+    let list: { id: string; name: string }[] = [];
+    tree.forEach((node) => {
+      list.push({ id: node.id, name: "  ".repeat(depth) + "📁 " + node.name });
+      if (node.children && node.children.length > 0) {
+        list = list.concat(getFlatCategoriesList(node.children, depth + 1));
+      }
+    });
+    return list;
+  };
+
+  const flatCategories = getFlatCategoriesList(categories);
+
+  // Collapsible category node component
+  const renderCategoryNode = (node: CategoryTree) => {
+    const hasChildren = node.children && node.children.length > 0;
+    const isCollapsed = collapsedCategories[node.id];
+    const isSelected = selectedCategoryFilter === node.id;
+
+    return (
+      <div key={node.id} className="space-y-1">
+        <div
+          onClick={() => {
+            setSelectedCategoryFilter(isSelected ? null : node.id);
+            setSelectedTagFilter(null); // Clear tag filter
+          }}
+          className={`flex items-center justify-between px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer transition-all ${
+            isSelected
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+              : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => toggleCollapseCategory(node.id, e)}
+              className="p-0.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300"
+            >
+              {hasChildren ? (
+                isCollapsed ? (
+                  <ChevronRight className="h-3 w-3" />
+                ) : (
+                  <ChevronDown className="h-3 w-3" />
+                )
+              ) : (
+                <div className="h-3 w-3" />
+              )}
+            </button>
+            {isSelected ? <FolderOpen className="h-3.5 w-3.5" /> : <Folder className="h-3.5 w-3.5" />}
+            <span className="truncate">{node.name}</span>
+          </div>
+        </div>
+
+        {hasChildren && !isCollapsed && (
+          <div className="pl-4 border-l border-zinc-900 ml-3 space-y-1">
+            {node.children.map((child) => renderCategoryNode(child))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-black text-zinc-100 font-sans">
-      {/* ── SIDEBAR (Library list mode only) ────────────────────────── */}
+      {/* ── SIDEBAR ────────────────────────────────────────────────── */}
       {viewMode === "library" && (
-        <aside className="w-64 border-r border-zinc-900 bg-zinc-950/40 flex flex-col justify-between shrink-0">
+        <aside className="w-64 border-r border-zinc-900 bg-zinc-950/40 flex flex-col justify-between shrink-0 overflow-y-auto">
           <div className="flex flex-col flex-1 min-h-0">
             {/* Brand Logo */}
             <div className="p-6 border-b border-zinc-900 flex items-center justify-between">
@@ -257,7 +423,7 @@ export default function Home() {
                 <select
                   value={activeWorkspaceId}
                   onChange={(e) => setActiveWorkspaceId(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-2 pl-3 pr-8 text-sm focus:outline-none focus:border-emerald-500/50 appearance-none transition-all hover:bg-zinc-900/80 cursor-pointer text-zinc-300"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg py-2 pl-3 pr-8 text-sm focus:outline-none focus:border-emerald-500/50 appearance-none transition-all hover:bg-zinc-900/80 cursor-pointer text-zinc-300 font-medium"
                 >
                   {workspaces.map((ws) => (
                     <option key={ws.id} value={ws.id} className="bg-zinc-950 text-zinc-300">
@@ -276,51 +442,97 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Navigation Links */}
-            <nav className="p-4 space-y-1.5 flex-1 overflow-y-auto">
-              <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-2 px-1">
-                Platform Library
-              </label>
-              <a
-                href="#"
-                className="flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 transition-all"
-              >
-                <div className="flex items-center gap-2.5">
-                  <BookOpen className="h-4 w-4" />
-                  <span>Context Library</span>
+            {/* Library Links */}
+            <div className="p-4 space-y-4 flex-1">
+              {/* Contexts Section */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-2 px-1 font-mono">
+                  Platform Library
+                </label>
+                <a
+                  href="#"
+                  onClick={() => {
+                    setSelectedCategoryFilter(null);
+                    setSelectedTagFilter(null);
+                  }}
+                  className={`flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+                    !selectedCategoryFilter && !selectedTagFilter
+                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                      : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <BookOpen className="h-4 w-4" />
+                    <span>All Contexts</span>
+                  </div>
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                    {contexts.length}
+                  </span>
+                </a>
+              </div>
+
+              {/* Collapsible Folders Tree */}
+              <div className="space-y-1.5 border-t border-zinc-900 pt-4">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block font-mono">
+                    Folder Categories
+                  </label>
+                  <button
+                    onClick={() => setIsCatCreateOpen(true)}
+                    className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/60 transition-all"
+                  >
+                    <FolderPlus className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
-                  {contexts.length}
-                </span>
-              </a>
-              <a
-                href="#"
-                className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-all"
-              >
-                <FileCode className="h-4 w-4" />
-                <span>Prompt Templates</span>
-              </a>
-              <a
-                href="#"
-                className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-all"
-              >
-                <Cpu className="h-4 w-4" />
-                <span>AI Conversations</span>
-              </a>
-              <a
-                href="#"
-                className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 transition-all"
-              >
-                <Sliders className="h-4 w-4" />
-                <span>System Variables</span>
-              </a>
-            </nav>
+                <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1">
+                  {categories.length === 0 ? (
+                    <span className="text-[10px] text-zinc-600 block pl-1 italic font-mono">
+                      No categories created
+                    </span>
+                  ) : (
+                    categories.map((cat) => renderCategoryNode(cat))
+                  )}
+                </div>
+              </div>
+
+              {/* Tag filters list */}
+              <div className="space-y-1.5 border-t border-zinc-900 pt-4">
+                <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-2 px-1 font-mono">
+                  Filter by Tag
+                </label>
+                <div className="flex flex-wrap gap-1.5 max-h-[150px] overflow-y-auto pr-1">
+                  {tags.length === 0 ? (
+                    <span className="text-[10px] text-zinc-600 block pl-1 italic font-mono">
+                      No tags registry
+                    </span>
+                  ) : (
+                    tags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        onClick={() => {
+                          setSelectedTagFilter(selectedTagFilter === tag.name ? null : tag.name);
+                          setSelectedCategoryFilter(null); // Clear folder filter
+                        }}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded transition-all cursor-pointer border ${
+                          selectedTagFilter === tag.name
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500"
+                            : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700"
+                        }`}
+                        style={{ borderColor: selectedTagFilter === tag.name ? undefined : tag.color || undefined }}
+                      >
+                        #{tag.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Workspace Info Panel */}
-          <div className="p-4 border-t border-zinc-900 bg-zinc-950 flex flex-col gap-2">
+          {/* Footer Info */}
+          <div className="p-4 border-t border-zinc-900 bg-zinc-950 shrink-0">
             {activeWorkspace && (
-              <div className="px-1 py-0.5">
+              <div className="px-1">
                 <span className="text-[11px] text-zinc-400 font-medium line-clamp-1">
                   {activeWorkspace.name}
                 </span>
@@ -336,9 +548,9 @@ export default function Home() {
       {/* ── CENTRAL DISPLAY AREA ───────────────────────────────────── */}
       {viewMode === "library" ? (
         /* ── LIBRARY CARD INDEX VIEW ── */
-        <main className="flex-1 flex flex-col overflow-hidden bg-black animate-fade-in">
+        <main className="flex-1 flex flex-col overflow-hidden bg-black">
           {/* Top Header Filter & Search */}
-          <header className="h-16 border-b border-zinc-900 px-8 flex items-center justify-between gap-4">
+          <header className="h-16 border-b border-zinc-900 px-8 flex items-center justify-between gap-4 shrink-0">
             {/* Type Filter Tabs */}
             <div className="flex items-center gap-1.5">
               <button
@@ -383,6 +595,27 @@ export default function Home() {
               </button>
             </div>
 
+            {/* Filter Indicators (Clear filters) */}
+            {(selectedCategoryFilter || selectedTagFilter) && (
+              <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg text-xs">
+                <span className="text-zinc-400 font-medium font-mono">
+                  Filter:{" "}
+                  {selectedCategoryFilter
+                    ? `Folder / ${categories.find((c) => c.id === selectedCategoryFilter)?.name || "Selected"}`
+                    : `Tag / #${selectedTagFilter}`}
+                </span>
+                <button
+                  onClick={() => {
+                    setSelectedCategoryFilter(null);
+                    setSelectedTagFilter(null);
+                  }}
+                  className="p-0.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
             {/* Search bar */}
             <div className="relative max-w-sm w-full">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
@@ -391,14 +624,14 @@ export default function Home() {
                 placeholder="Search contexts..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-900 rounded-lg py-2 pl-9 pr-4 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition-all"
+                className="w-full bg-zinc-950 border border-zinc-900 rounded-lg py-2 pl-9 pr-4 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition-all font-medium"
               />
             </div>
 
             {/* Actions */}
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="flex items-center gap-1.5 bg-emerald-500 text-black font-semibold text-xs py-2 px-4 rounded-lg hover:bg-emerald-400 transition-all cursor-pointer shadow-lg shadow-emerald-500/10"
+              className="flex items-center gap-1.5 bg-emerald-500 text-black font-bold text-xs py-2 px-4 rounded-lg hover:bg-emerald-400 transition-all cursor-pointer shadow-lg shadow-emerald-500/10 shrink-0"
             >
               <Plus className="h-3.5 w-3.5" />
               Create Context
@@ -411,22 +644,22 @@ export default function Home() {
               <div className="flex items-center justify-center h-64">
                 <div className="h-6 w-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : contexts.length === 0 ? (
+            ) : filteredContexts.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center">
                 <div className="h-12 w-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 mb-4">
                   <BookOpen className="h-6 w-6" />
                 </div>
                 <h3 className="font-semibold text-zinc-300">No contexts found</h3>
-                <p className="text-xs text-zinc-500 max-w-xs mt-1">
+                <p className="text-xs text-zinc-500 max-w-xs mt-1 font-mono">
                   {searchQuery
-                    ? "Try refining your search query term."
-                    : "Create a new Context to begin mapping prompt parameters."}
+                    ? "Try adjusting search query strings."
+                    : "No matching context instances in this workspace."}
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 <AnimatePresence>
-                  {contexts.map((ctx) => (
+                  {filteredContexts.map((ctx) => (
                     <motion.div
                       key={ctx.id}
                       layout
@@ -439,17 +672,25 @@ export default function Home() {
                     >
                       {/* Header tags */}
                       <div className="flex items-center justify-between gap-2 mb-3">
-                        <span
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded uppercase ${
-                            ctx.context_type === "knowledge"
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : ctx.context_type === "instruction"
-                              ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                              : "bg-purple-500/10 text-purple-400 border border-purple-500/20"
-                          }`}
-                        >
-                          {ctx.context_type}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                              ctx.context_type === "knowledge"
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : ctx.context_type === "instruction"
+                                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                : "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                            }`}
+                          >
+                            {ctx.context_type}
+                          </span>
+                          {ctx.category_id && (
+                            <span className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
+                              <Folder className="h-3 w-3" />
+                              Folder
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                           {ctx.is_pinned === 1 && (
                             <Pin className="h-3 w-3 text-emerald-400 fill-emerald-400" />
@@ -467,6 +708,21 @@ export default function Home() {
                       <p className="text-xs text-zinc-500 line-clamp-3 mb-4 leading-relaxed font-mono">
                         {ctx.content}
                       </p>
+
+                      {/* Tag pill overlays */}
+                      {ctx.tags && ctx.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {ctx.tags.map((t) => (
+                            <span
+                              key={t.id}
+                              className="text-[9px] px-1.5 py-0.5 rounded font-mono font-medium"
+                              style={{ backgroundColor: (t.color || "#10b981") + "15", color: t.color || "#10b981" }}
+                            >
+                              #{t.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                       {/* Footer Stats */}
                       <div className="flex items-center justify-between border-t border-zinc-900/60 pt-3 text-[10px] text-zinc-500 font-mono">
@@ -598,7 +854,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Far Right Sidebar Panel: Properties, Config, Versions */}
+            {/* Far Right Sidebar Panel: Properties, Category selector, Tag Manager, Versions */}
             <aside className="w-72 border-l border-zinc-900 bg-zinc-950/60 flex flex-col overflow-y-auto shrink-0 justify-between">
               <div className="p-6 space-y-6">
                 {/* Properties */}
@@ -606,6 +862,96 @@ export default function Home() {
                   <h4 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-4 font-mono">
                     Context Metadata
                   </h4>
+
+                  {/* Category folder selector */}
+                  <div className="space-y-1 mb-4">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block font-mono">
+                      Category Folder
+                    </label>
+                    <select
+                      value={editorCategoryId || ""}
+                      onChange={(e) => setEditorCategoryId(e.target.value || null)}
+                      className="w-full bg-black border border-zinc-900 rounded-lg p-2.5 text-xs text-zinc-300 focus:outline-none"
+                    >
+                      <option value="">📁 No Category Folder</option>
+                      {flatCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Inline Tag picker */}
+                  <div className="space-y-2 mb-4">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block font-mono">
+                      Tags Assignment
+                    </label>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {editorTagIds.map((tid) => {
+                        const tag = tags.find((t) => t.id === tid);
+                        if (!tag) return null;
+                        return (
+                          <span
+                            key={tid}
+                            className="text-[9px] font-semibold px-2 py-0.5 rounded font-mono flex items-center gap-1"
+                            style={{ backgroundColor: (tag.color || "#10b981") + "15", color: tag.color || "#10b981" }}
+                          >
+                            #{tag.name}
+                            <button
+                              onClick={() => setEditorTagIds((prev) => prev.filter((id) => id !== tid))}
+                              className="hover:text-red-400 font-bold"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+
+                    {/* Tag autocomplete or create select */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Type tag and press Enter..."
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && tagInput.trim()) {
+                            const trimmed = tagInput.trim();
+                            const existing = tags.find((t) => t.name.toLowerCase() == trimmed.toLowerCase());
+                            if (existing) {
+                              if (!editorTagIds.includes(existing.id)) {
+                                setEditorTagIds((prev) => [...prev, existing.id]);
+                              }
+                              setTagInput("");
+                            } else {
+                              createInlineTagMutation.mutate(trimmed);
+                            }
+                          }
+                        }}
+                        className="w-full bg-black border border-zinc-900 rounded-lg p-2.5 text-xs focus:outline-none"
+                      />
+                      {tagInput.trim() && (
+                        <div className="absolute left-0 right-0 mt-1 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg z-50 max-h-[120px] overflow-y-auto">
+                          {tags
+                            .filter((t) => t.name.toLowerCase().includes(tagInput.toLowerCase()) && !editorTagIds.includes(t.id))
+                            .map((t) => (
+                              <div
+                                key={t.id}
+                                onClick={() => {
+                                  setEditorTagIds((prev) => [...prev, t.id]);
+                                  setTagInput("");
+                                }}
+                                className="px-3 py-1.5 hover:bg-zinc-800 text-xs font-mono text-zinc-300 cursor-pointer"
+                              >
+                                #{t.name}
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Priority Slider */}
                   <div className="space-y-2 mb-4">
@@ -673,7 +1019,7 @@ export default function Home() {
                   <h4 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-4 font-mono flex items-center gap-1">
                     <History className="h-3.5 w-3.5" /> Version History
                   </h4>
-                  <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                     {versionHistory.map((ver) => (
                       <div
                         key={ver.id}
@@ -763,6 +1109,25 @@ export default function Home() {
                     onChange={(e) => setNewContent(e.target.value)}
                     className="w-full bg-black border border-zinc-900 rounded-lg p-2.5 text-sm font-mono focus:outline-none focus:border-emerald-500/50 resize-y leading-relaxed"
                   />
+                </div>
+
+                {/* Category folder selector */}
+                <div>
+                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block font-mono">
+                    Category Folder
+                  </label>
+                  <select
+                    value={newCategoryId}
+                    onChange={(e) => setNewCategoryId(e.target.value)}
+                    className="w-full bg-black border border-zinc-900 rounded-lg p-2.5 text-xs focus:outline-none text-zinc-300"
+                  >
+                    <option value="">📁 No Category Folder</option>
+                    {flatCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Type & priority grid */}
@@ -895,6 +1260,99 @@ export default function Home() {
                   className="flex-1 bg-emerald-500 text-black font-semibold text-xs py-2.5 rounded-lg hover:bg-emerald-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-center"
                 >
                   Create
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── CREATE CATEGORY MODAL ──────────────────────────────────── */}
+      <AnimatePresence>
+        {isCatCreateOpen && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-zinc-950 border border-zinc-900 rounded-2xl w-full max-w-md p-6"
+            >
+              <div className="flex items-center justify-between mb-4 pb-4 border-b border-zinc-900">
+                <h3 className="font-bold text-lg text-zinc-50 flex items-center gap-2">
+                  <FolderPlus className="h-5 w-5 text-emerald-400" />
+                  New Category Folder
+                </h3>
+                <button
+                  onClick={() => setIsCatCreateOpen(false)}
+                  className="text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Category Name */}
+                <div>
+                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1 font-mono">
+                    Folder Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Core Prompt Guides"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    className="w-full bg-black border border-zinc-900 rounded-lg p-2.5 text-sm focus:outline-none focus:border-emerald-500/50"
+                  />
+                </div>
+
+                {/* Parent category */}
+                <div>
+                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block font-mono">
+                    Parent Category (Optional)
+                  </label>
+                  <select
+                    value={newCatParentId}
+                    onChange={(e) => setNewCatParentId(e.target.value)}
+                    className="w-full bg-black border border-zinc-900 rounded-lg p-2.5 text-xs text-zinc-300 focus:outline-none"
+                  >
+                    <option value="">📁 No Parent (Root Folder)</option>
+                    {flatCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block mb-1 font-mono">
+                    Description
+                  </label>
+                  <textarea
+                    placeholder="Optional category description..."
+                    rows={2}
+                    value={newCatDesc}
+                    onChange={(e) => setNewCatDesc(e.target.value)}
+                    className="w-full bg-black border border-zinc-900 rounded-lg p-2.5 text-sm focus:outline-none focus:border-emerald-500/50 resize-none"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 mt-6 pt-4 border-t border-zinc-900">
+                <button
+                  onClick={() => setIsCatCreateOpen(false)}
+                  className="flex-1 text-xs font-semibold py-2.5 rounded-lg border border-zinc-900 hover:bg-zinc-900 text-zinc-400 transition-all cursor-pointer text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => createCategoryMutation.mutate()}
+                  disabled={!newCatName.trim()}
+                  className="flex-1 bg-emerald-500 text-black font-semibold text-xs py-2.5 rounded-lg hover:bg-emerald-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-center"
+                >
+                  Create Folder
                 </button>
               </div>
             </motion.div>

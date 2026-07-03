@@ -27,6 +27,8 @@ export interface Context {
   is_archived: number;
   current_version: number;
   metadata_json: Record<string, any> | null;
+  category_id: string | null;
+  tags?: Tag[];
   created_at: string;
   updated_at: string;
 }
@@ -87,6 +89,8 @@ export async function createContext(
     priority?: number;
     confidence?: number;
     metadata_json?: Record<string, any> | null;
+    category_id?: string | null;
+    tag_ids?: string[];
   }
 ): Promise<Context> {
   const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/contexts`, {
@@ -104,7 +108,7 @@ export async function createContext(
 export async function updateContext(
   workspaceId: string,
   contextId: string,
-  data: Partial<Context>
+  data: Partial<Context> & { tag_ids?: string[] }
 ): Promise<Context> {
   const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/contexts/${contextId}`, {
     method: "PUT",
