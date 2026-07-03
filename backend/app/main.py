@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings
 from app.core.database import init_db
+from app.core.logging import setup_logging
 from app.core.middleware import register_exception_handlers
 
 
@@ -17,6 +18,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """Create and configure the FastAPI application."""
     if settings is None:
         settings = Settings()
+
+    setup_logging(settings)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
