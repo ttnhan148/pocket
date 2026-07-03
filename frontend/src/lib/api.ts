@@ -132,3 +132,21 @@ export async function setDefaultWorkspace(workspaceId: string): Promise<Workspac
   if (!res.ok) throw new Error("Failed to set default workspace");
   return res.json();
 }
+
+export interface ContextVersion {
+  id: string;
+  context_id: string;
+  version_number: number;
+  title: string;
+  content: string;
+  created_at: string;
+}
+
+export async function fetchContextVersions(
+  workspaceId: string,
+  contextId: string
+): Promise<ContextVersion[]> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/contexts/${contextId}/versions`);
+  if (!res.ok) throw new Error("Failed to fetch context versions");
+  return res.json();
+}
