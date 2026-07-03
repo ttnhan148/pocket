@@ -59,11 +59,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 def _register_routers(app: FastAPI) -> None:
     """Register all API routers."""
+    from app.features.context.router import router as context_router  # noqa: PLC0415
     from app.features.health.router import router as health_router  # noqa: PLC0415
     from app.features.workspace.router import router as workspace_router  # noqa: PLC0415
 
     app.include_router(health_router, prefix="/api/v1", tags=["Health"])
     app.include_router(workspace_router, prefix="/api/v1/workspaces", tags=["Workspaces"])
+    app.include_router(context_router, prefix="/api/v1/workspaces/{workspace_id}/contexts", tags=["Contexts"])
 
 
 # Default app instance for uvicorn

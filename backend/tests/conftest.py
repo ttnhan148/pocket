@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Generator
+from typing import Any
 
 import pytest
 import pytest_asyncio
+import sqlalchemy as sa
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -34,6 +36,41 @@ def test_settings() -> Settings:
     )
 
 
+
+async def _create_fts_tables(conn: Any) -> None:
+    """Create virtual FTS5 tables and synchronization triggers for testing."""
+    await conn.execute(sa.text("""
+        CREATE VIRTUAL TABLE contexts_fts USING fts5(
+            title,
+            content,
+            context_type,
+            content='contexts',
+            content_rowid='rowid',
+            tokenize='porter unicode61 remove_diacritics 2'
+        );
+    """))
+    await conn.execute(sa.text("""
+        CREATE TRIGGER contexts_ai AFTER INSERT ON contexts BEGIN
+            INSERT INTO contexts_fts(rowid, title, content, context_type)
+            VALUES (new.rowid, new.title, new.content, new.context_type);
+        END;
+    """))
+    await conn.execute(sa.text("""
+        CREATE TRIGGER contexts_au AFTER UPDATE ON contexts BEGIN
+            INSERT INTO contexts_fts(contexts_fts, rowid, title, content, context_type)
+            VALUES ('delete', old.rowid, old.title, old.content, old.context_type);
+            INSERT INTO contexts_fts(rowid, title, content, context_type)
+            VALUES (new.rowid, new.title, new.content, new.context_type);
+        END;
+    """))
+    await conn.execute(sa.text("""
+        CREATE TRIGGER contexts_ad AFTER DELETE ON contexts BEGIN
+            INSERT INTO contexts_fts(contexts_fts, rowid, title, content, context_type)
+            VALUES ('delete', old.rowid, old.title, old.content, old.context_type);
+        END;
+    """))
+
+
 @pytest_asyncio.fixture
 async def client(test_settings: Settings) -> AsyncIterator[AsyncClient]:
     """Async HTTP client for testing API endpoints."""
@@ -41,6 +78,7 @@ async def client(test_settings: Settings) -> AsyncIterator[AsyncClient]:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _create_fts_tables(conn)
 
     app = create_app(settings=test_settings)
     transport = ASGITransport(app=app)
@@ -60,6 +98,7 @@ async def db_session(test_settings: Settings) -> AsyncIterator[AsyncSession]:
     # Create all tables in memory
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _create_fts_tables(conn)
 
     session_factory = async_sessionmaker(
         bind=engine,

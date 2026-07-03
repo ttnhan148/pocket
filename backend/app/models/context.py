@@ -3,8 +3,19 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import Column, Float, ForeignKey, Integer, String, Table, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Column,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel, utc_now
@@ -81,7 +92,7 @@ class Context(BaseModel):
     is_pinned: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_archived: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    metadata_json: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("workspace_id", "slug", name="uq_contexts_workspace_slug"),
