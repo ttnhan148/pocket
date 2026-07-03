@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-tertiary: var(--bg-tertiary);
+  --color-bg-hover: var(--bg-hover);
+  --color-bg-active: var(--bg-active);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-inverse: var(--text-inverse);
+
+  --color-border-default: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-border-focus: var(--border-focus);
+
+  --color-accent: var(--accent-primary);
+  --color-accent-hover: var(--accent-primary-hover);
+  --color-accent-subtle: var(--accent-primary-subtle);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  --color-ctx-persona: var(--ctx-persona);
+  --color-ctx-role: var(--ctx-role);
+  --color-ctx-instruction: var(--ctx-instruction);
+  --color-ctx-knowledge: var(--ctx-knowledge);
+  --color-ctx-constraint: var(--ctx-constraint);
+  --color-ctx-example: var(--ctx-example);
+  --color-ctx-reference: var(--ctx-reference);
+  --color-ctx-snippet: var(--ctx-snippet);
+
+  --font-sans: var(--font-geist-sans), Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), JetBrains Mono, Fira Code, monospace;
+}
+
+:root {
+  /* Dark Mode (Default) */
+  --bg-primary: #09090B;
+  --bg-secondary: #18181B;
+  --bg-tertiary: #27272A;
+  --bg-hover: #2D2D30;
+  --bg-active: #3F3F46;
+
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-tertiary: #71717A;
+  --text-inverse: #09090B;
+
+  --border-default: #27272A;
+  --border-subtle: #1F1F23;
+  --border-strong: #3F3F46;
+  --border-focus: #3B82F6;
+
+  --accent-primary: #3B82F6;
+  --accent-primary-hover: #2563EB;
+  --accent-primary-subtle: rgba(59, 130, 246, 0.1);
+
+  --success: #22C55E;
+  --success-subtle: rgba(34, 197, 94, 0.1);
+  --warning: #EAB308;
+  --warning-subtle: rgba(234, 179, 8, 0.1);
+  --error: #EF4444;
+  --error-subtle: rgba(239, 68, 68, 0.1);
+  --info: #3B82F6;
+  --info-subtle: rgba(59, 130, 246, 0.1);
+
+  --ctx-persona: #8B5CF6;
+  --ctx-role: #06B6D4;
+  --ctx-instruction: #3B82F6;
+  --ctx-knowledge: #22C55E;
+  --ctx-constraint: #EAB308;
+  --ctx-example: #F97316;
+  --ctx-reference: #EC4899;
+  --ctx-snippet: #6366F1;
+}
+
+[data-theme="light"] {
+  /* Light Mode */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --bg-tertiary: #F1F5F9;
+  --bg-hover: #E2E8F0;
+  --bg-active: #CBD5E1;
+
+  --text-primary: #0F172A;
+  --text-secondary: #64748B;
+  --text-tertiary: #94A3B8;
+  --text-inverse: #FAFAFA;
+
+  --border-default: #E2E8F0;
+  --border-subtle: #F1F5F9;
+  --border-strong: #CBD5E1;
+  --border-focus: #3B82F6;
+
+  --accent-primary: #3B82F6;
+  --accent-primary-hover: #2563EB;
+  --accent-primary-subtle: rgba(59, 130, 246, 0.08);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-active);
+}
+
+/* Global focus style */
+*:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
