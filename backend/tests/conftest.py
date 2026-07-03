@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Generator
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
+from app.core.database import get_engine, init_db
 from app.main import create_app
+from app.models import Base
 
-
-from collections.abc import Generator
 
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
@@ -40,3 +41,27 @@ async def client(test_settings: Settings) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+@pytest_asyncio.fixture
+async def db_session(test_settings: Settings) -> AsyncIterator[AsyncSession]:
+    """Provide an isolated database session with tables created."""
+    await init_db(test_settings)
+    engine = get_engine()
+
+    # Create all tables in memory
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with session_factory() as session:
+        yield session
+
+    # Clean up
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)

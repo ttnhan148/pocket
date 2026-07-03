@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path
-
 from typing import Any
 
 from sqlalchemy import event, text
@@ -45,13 +44,16 @@ async def init_db(settings: Settings) -> None:
     db_path = os.path.expanduser(settings.db_path)
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
-    _engine = create_async_engine(
-        settings.database_url,
-        echo=settings.env == "development",
-        pool_size=5,
-        max_overflow=10,
-        pool_pre_ping=True,
-    )
+    kwargs: dict[str, Any] = {
+        "echo": settings.env == "development",
+        "pool_pre_ping": True,
+    }
+    # SQLite in-memory database does not support standard QueuePool arguments
+    if ":memory:" not in settings.database_url:
+        kwargs["pool_size"] = 5
+        kwargs["max_overflow"] = 10
+
+    _engine = create_async_engine(settings.database_url, **kwargs)
 
     # Set PRAGMAs on the sync driver level
     event.listen(_engine.sync_engine, "connect", _set_sqlite_pragmas)
