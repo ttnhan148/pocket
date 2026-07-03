@@ -47,6 +47,7 @@ import {
   fetchCategoriesTree,
   createCategory,
   deleteCategory,
+  fetchDependencyGraph,
   Workspace,
   Context,
   ContextVersion,
@@ -160,6 +161,13 @@ export default function Home() {
         tag: selectedTagFilter,
       });
     },
+    enabled: !!activeWorkspaceId,
+  });
+
+  // Query dependency graph
+  const { data: dependencyGraph = { nodes: [], edges: [], topological_order: [] } } = useQuery({
+    queryKey: ["dependency-graph", activeWorkspaceId],
+    queryFn: () => fetchDependencyGraph(activeWorkspaceId),
     enabled: !!activeWorkspaceId,
   });
 
@@ -303,6 +311,28 @@ export default function Home() {
         setNewTagIds((prev) => [...prev, newTag.id]);
       }
       setTagInput("");
+    },
+  });
+  const addDependencyMutation = useMutation({
+    mutationFn: ({ sourceId, targetId, type }: { sourceId: string; targetId: string; type: string }) =>
+      import("@/lib/api").then((api) =>
+        api.addContextDependency(activeWorkspaceId, sourceId, targetId, type)
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dependency-graph", activeWorkspaceId] });
+    },
+    onError: (err: any) => {
+      alert(err.message || "Failed to add dependency relationship.");
+    },
+  });
+
+  const removeDependencyMutation = useMutation({
+    mutationFn: ({ sourceId, targetId }: { sourceId: string; targetId: string }) =>
+      import("@/lib/api").then((api) =>
+        api.removeContextDependency(activeWorkspaceId, sourceId, targetId)
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dependency-graph", activeWorkspaceId] });
     },
   });
 
@@ -1011,6 +1041,79 @@ export default function Home() {
                         className="rounded border-zinc-800 text-amber-500 focus:ring-amber-500/20 bg-black cursor-pointer h-4 w-4"
                       />
                     </label>
+                  </div>
+
+                  {/* Context Dependencies Manager */}
+                  <div className="space-y-4 border-t border-zinc-900 pt-6 mt-6">
+                    <label className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider block font-mono">
+                      DAG Dependencies
+                    </label>
+                    
+                    {/* List existing dependencies */}
+                    <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                      {dependencyGraph.edges
+                        .filter((e) => e.source_id === editingContext?.id)
+                        .map((edge) => {
+                          const targetNode = dependencyGraph.nodes.find((n) => n.id === edge.target_id);
+                          return (
+                            <div
+                              key={edge.target_id}
+                              className="flex items-center justify-between p-2 rounded bg-black/40 border border-zinc-900 text-xs font-mono"
+                            >
+                              <div className="truncate pr-2">
+                                <span className="text-zinc-300 font-semibold">{targetNode?.title || "Context"}</span>
+                                <span className="text-[10px] text-zinc-500 block">Type: {edge.dependency_type} (W: {edge.weight})</span>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  removeDependencyMutation.mutate({
+                                    sourceId: editingContext!.id,
+                                    targetId: edge.target_id,
+                                  })
+                                }
+                                className="text-red-400 hover:text-red-300 px-1 font-bold"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
+                      {dependencyGraph.edges.filter((e) => e.source_id === editingContext?.id).length === 0 && (
+                        <span className="text-[10px] text-zinc-600 italic block font-mono">No dependency constraints</span>
+                      )}
+                    </div>
+
+                    {/* Add dependency edge form */}
+                    <div className="space-y-2">
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            addDependencyMutation.mutate({
+                              sourceId: editingContext!.id,
+                              targetId: e.target.value,
+                              type: "requires",
+                            });
+                            e.target.value = "";
+                          }
+                        }}
+                        className="w-full bg-black border border-zinc-900 rounded-lg p-2 text-xs text-zinc-400 focus:outline-none"
+                      >
+                        <option value="">➕ Add Dependency...</option>
+                        {dependencyGraph.nodes
+                          .filter(
+                            (node) =>
+                              node.id !== editingContext?.id &&
+                              !dependencyGraph.edges.some(
+                                (e) => e.source_id === editingContext?.id && e.target_id === node.id
+                              )
+                          )
+                          .map((node) => (
+                            <option key={node.id} value={node.id}>
+                              {node.title}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
 

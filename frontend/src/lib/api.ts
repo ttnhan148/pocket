@@ -223,3 +223,73 @@ export async function deleteCategory(workspaceId: string, categoryId: string): P
   });
   if (!res.ok) throw new Error("Failed to delete category");
 }
+
+export interface Dependency {
+  id: string;
+  source_id: string;
+  target_id: string;
+  dependency_type: string;
+  weight: number;
+  description: string | null;
+  created_at: string;
+}
+
+export interface DependencyGraphNode {
+  id: string;
+  title: string;
+  slug: string;
+  context_type: string;
+}
+
+export interface DependencyGraphEdge {
+  source_id: string;
+  target_id: string;
+  dependency_type: string;
+  weight: number;
+}
+
+export interface DependencyGraph {
+  nodes: DependencyGraphNode[];
+  edges: DependencyGraphEdge[];
+  topological_order: string[];
+}
+
+export async function addContextDependency(
+  workspaceId: string,
+  contextId: string,
+  targetId: string,
+  dependencyType = "requires",
+  weight = 1.0,
+  description?: string
+): Promise<Dependency> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/contexts/${contextId}/dependencies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target_id: targetId, dependency_type: dependencyType, weight, description }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to add context dependency");
+  }
+  return res.json();
+}
+
+export async function removeContextDependency(
+  workspaceId: string,
+  contextId: string,
+  targetId: string
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE_URL}/workspaces/${workspaceId}/contexts/${contextId}/dependencies/${targetId}`,
+    {
+      method: "DELETE",
+    }
+  );
+  if (!res.ok) throw new Error("Failed to remove dependency relationship");
+}
+
+export async function fetchDependencyGraph(workspaceId: string): Promise<DependencyGraph> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/dependency-graph`);
+  if (!res.ok) throw new Error("Failed to fetch dependency graph");
+  return res.json();
+}
