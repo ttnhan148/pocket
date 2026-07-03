@@ -150,3 +150,72 @@ export async function fetchContextVersions(
   if (!res.ok) throw new Error("Failed to fetch context versions");
   return res.json();
 }
+
+export interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+  color: string | null;
+  usage_count: number;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+  sort_order: number;
+  parent_id: string | null;
+}
+
+export interface CategoryTree extends Category {
+  children: CategoryTree[];
+}
+
+export async function fetchTags(workspaceId: string): Promise<Tag[]> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/tags`);
+  if (!res.ok) throw new Error("Failed to fetch tags");
+  return res.json();
+}
+
+export async function createTag(
+  workspaceId: string,
+  name: string,
+  color?: string
+): Promise<Tag> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/tags`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, color }),
+  });
+  if (!res.ok) throw new Error("Failed to create tag");
+  return res.json();
+}
+
+export async function fetchCategoriesTree(workspaceId: string): Promise<CategoryTree[]> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/categories`);
+  if (!res.ok) throw new Error("Failed to fetch categories tree");
+  return res.json();
+}
+
+export async function createCategory(
+  workspaceId: string,
+  data: Partial<Category>
+): Promise<Category> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/categories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create category");
+  return res.json();
+}
+
+export async function deleteCategory(workspaceId: string, categoryId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/categories/${categoryId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete category");
+}

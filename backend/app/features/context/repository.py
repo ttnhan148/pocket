@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.repository import BaseRepository
 from app.models import Context
@@ -16,12 +17,29 @@ class ContextRepository(BaseRepository[Context]):
     def __init__(self, db: AsyncSession) -> None:
         super().__init__(Context, db)
 
+    async def get(self, id_: str) -> Context | None:
+        """Get a single Context by ID with eagerly loaded tags."""
+        stmt = (
+            select(Context)
+            .options(selectinload(Context.tags))
+            .where(
+                Context.id == id_,
+                Context.deleted_at.is_(None),
+            )
+        )
+        res = await self.db.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def get_by_slug(self, workspace_id: str, slug: str) -> Context | None:
-        """Fetch a context by workspace and slug."""
-        stmt = select(Context).where(
-            Context.workspace_id == workspace_id,
-            Context.slug == slug,
-            Context.deleted_at.is_(None),
+        """Fetch a context by workspace and slug with eagerly loaded tags."""
+        stmt = (
+            select(Context)
+            .options(selectinload(Context.tags))
+            .where(
+                Context.workspace_id == workspace_id,
+                Context.slug == slug,
+                Context.deleted_at.is_(None),
+            )
         )
         res = await self.db.execute(stmt)
         return res.scalar_one_or_none()
@@ -36,10 +54,14 @@ class ContextRepository(BaseRepository[Context]):
         skip: int = 0,
         limit: int = 100,
     ) -> list[Context]:
-        """List contexts inside a workspace with optional filters."""
-        stmt = select(Context).where(
-            Context.workspace_id == workspace_id,
-            Context.deleted_at.is_(None),
+        """List contexts inside a workspace with optional filters and eagerly loaded tags."""
+        stmt = (
+            select(Context)
+            .options(selectinload(Context.tags))
+            .where(
+                Context.workspace_id == workspace_id,
+                Context.deleted_at.is_(None),
+            )
         )
 
         if context_type:
@@ -86,7 +108,11 @@ class ContextRepository(BaseRepository[Context]):
         if not ids:
             return []
 
-        # Load contexts by IDs
-        load_stmt = select(Context).where(Context.id.in_(ids))
+        # Load contexts by IDs with eagerly loaded tags
+        load_stmt = (
+            select(Context)
+            .options(selectinload(Context.tags))
+            .where(Context.id.in_(ids))
+        )
         load_res = await self.db.execute(load_stmt)
         return list(load_res.scalars().all())

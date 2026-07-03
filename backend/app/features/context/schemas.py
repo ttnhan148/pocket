@@ -7,6 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.features.tags_categories.schemas import TagResponse
+
 
 class ContextBase(BaseModel):
     """Base fields for Context schemas."""
@@ -30,6 +32,8 @@ class ContextCreate(BaseModel):
     priority: int = 50
     confidence: float = 1.0
     metadata_json: dict[str, Any] | None = None
+    category_id: str | None = None
+    tag_ids: list[str] | None = None
 
 
 class ContextUpdate(BaseModel):
@@ -42,6 +46,8 @@ class ContextUpdate(BaseModel):
     is_pinned: int | None = None
     is_archived: int | None = None
     metadata_json: dict[str, Any] | None = None
+    category_id: str | None = None
+    tag_ids: list[str] | None = None
 
 
 class ContextResponse(BaseModel):
@@ -64,6 +70,8 @@ class ContextResponse(BaseModel):
     is_archived: int
     current_version: int
     metadata_json: dict[str, Any] | None
+    category_id: str | None = None
+    tags: list[TagResponse] = []
     created_at: datetime
     updated_at: datetime
 

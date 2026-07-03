@@ -7,12 +7,13 @@ from typing import Any
 import tiktoken
 from slugify import slugify
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.service import BaseService
 from app.features.context.repository import ContextRepository
 from app.features.context.schemas import ContextCreate, ContextUpdate
-from app.models import Context, ContextVersion, Workspace
+from app.models import Category, Context, ContextVersion, Tag, Workspace
 
 
 class ContextService(BaseService):
@@ -49,6 +50,14 @@ class ContextService(BaseService):
                 existing = await self.repo.get_by_slug(workspace_id, slug)
                 counter += 1
 
+        category_id = None
+        if data.category_id:
+            cat_stmt = select(Category).where(Category.id == data.category_id)
+            cat_res = await self.db.execute(cat_stmt)
+            if not cat_res.scalar_one_or_none():
+                raise NotFoundError(data.category_id, "Category")
+            category_id = data.category_id
+
         token_count = self._estimate_token_count(data.content)
 
         context = Context(
@@ -62,7 +71,13 @@ class ContextService(BaseService):
             token_count=token_count,
             current_version=1,
             metadata_json=data.metadata_json,
+            category_id=category_id,
         )
+
+        if data.tag_ids:
+            tags_stmt = select(Tag).where(Tag.id.in_(data.tag_ids))
+            tags_res = await self.db.execute(tags_stmt)
+            context.tags = list(tags_res.scalars().all())
 
         created_context = await self.repo.create(context)
 
@@ -77,7 +92,11 @@ class ContextService(BaseService):
         self.db.add(version)
         await self.db.flush()
 
-        return created_context
+        # Refresh to eager load tags
+        refreshed_stmt = select(Context).options(selectinload(Context.tags)).where(Context.id == created_context.id)
+        refreshed_res = await self.db.execute(refreshed_stmt)
+        return refreshed_res.scalar_one()
+
 
     async def get_context(self, workspace_id: str, context_id: str) -> Context:
         """Retrieve a context, raising NotFoundError if it does not exist or belongs to another workspace."""
@@ -144,6 +163,25 @@ class ContextService(BaseService):
         if data.metadata_json is not None:
             update_dict["metadata_json"] = data.metadata_json
 
+        if data.category_id is not None:
+            if data.category_id:
+                cat_stmt = select(Category).where(Category.id == data.category_id)
+                cat_res = await self.db.execute(cat_stmt)
+                if not cat_res.scalar_one_or_none():
+                    raise NotFoundError(data.category_id, "Category")
+                update_dict["category_id"] = data.category_id
+            else:
+                update_dict["category_id"] = None
+
+        if data.tag_ids is not None:
+            if data.tag_ids:
+                tag_stmt = select(Tag).where(Tag.id.in_(data.tag_ids))
+                tag_res = await self.db.execute(tag_stmt)
+                context.tags = list(tag_res.scalars().all())
+            else:
+                context.tags = []
+            await self.db.flush()
+
         # Apply updates
         updated_context = await self.repo.update(context_id, update_dict)
 
@@ -163,7 +201,11 @@ class ContextService(BaseService):
             self.db.add(version_record)
             await self.db.flush()
 
-        return updated_context
+        # Refresh to eager load tags
+        refreshed_stmt = select(Context).options(selectinload(Context.tags)).where(Context.id == updated_context.id)
+        refreshed_res = await self.db.execute(refreshed_stmt)
+        return refreshed_res.scalar_one()
+
 
     async def list_versions(self, workspace_id: str, context_id: str) -> list[ContextVersion]:
         """List all version history records for a context."""
