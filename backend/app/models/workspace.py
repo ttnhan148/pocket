@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from typing import Any
+
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -20,7 +22,7 @@ class Workspace(BaseModel):
     color: Mapped[str | None] = mapped_column(String(7), nullable=True)  # Hex color (e.g. #FFFFFF)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_default: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # 0 or 1
-    metadata_json: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)  # JSON string
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSON, nullable=True)
 
     # Relationships
     settings: Mapped[list[WorkspaceSettings]] = relationship(

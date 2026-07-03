@@ -37,10 +37,18 @@ def test_settings() -> Settings:
 @pytest_asyncio.fixture
 async def client(test_settings: Settings) -> AsyncIterator[AsyncClient]:
     """Async HTTP client for testing API endpoints."""
+    await init_db(test_settings)
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     app = create_app(settings=test_settings)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest_asyncio.fixture
