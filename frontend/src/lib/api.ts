@@ -473,4 +473,302 @@ export async function testProvider(id: string): Promise<ProviderTestResponse> {
   return res.json();
 }
 
+// ── VARIABLES ENGINE ───────────────────────────────────────────────────
+
+export interface Variable {
+  id: string;
+  name: string;
+  display_name: string | null;
+  description: string | null;
+  default_value: string | null;
+  value_type: string;
+  options: string | null;
+  is_required: number;
+  is_system: number;
+  scope: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VariableResolveResponse {
+  name: string;
+  value: any;
+  value_type: string;
+  scope: string;
+  source: string;
+  is_override: boolean;
+}
+
+export async function fetchVariables(scope?: string): Promise<Variable[]> {
+  const params = new URLSearchParams();
+  if (scope) params.append("scope", scope);
+  const res = await fetch(`${API_BASE_URL}/variables?${params}`);
+  if (!res.ok) throw new Error("Failed to fetch variables");
+  return res.json();
+}
+
+export async function createVariable(data: {
+  name: string;
+  display_name?: string | null;
+  description?: string | null;
+  default_value?: string | null;
+  value_type?: string;
+  options?: string | null;
+  is_required?: number;
+  scope?: string;
+  sort_order?: number;
+}): Promise<Variable> {
+  const res = await fetch(`${API_BASE_URL}/variables`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to create variable");
+  }
+  return res.json();
+}
+
+export async function updateVariable(
+  id: string,
+  data: {
+    display_name?: string | null;
+    description?: string | null;
+    default_value?: string | null;
+    value_type?: string;
+    options?: string | null;
+    is_required?: number;
+    sort_order?: number;
+  }
+): Promise<Variable> {
+  const res = await fetch(`${API_BASE_URL}/variables/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to update variable");
+  }
+  return res.json();
+}
+
+export async function deleteVariable(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/variables/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to delete variable");
+  }
+}
+
+export async function saveWorkspaceVariableOverride(
+  variableId: string,
+  workspaceId: string,
+  value: string | null
+): Promise<{ workspace_id: string; variable_id: string; value: string | null }> {
+  const res = await fetch(`${API_BASE_URL}/variables/${variableId}/workspaces/${workspaceId}/override`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ value }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to save variable override");
+  }
+  return res.json();
+}
+
+export async function resolveVariables(
+  workspaceId: string,
+  templateVars?: Record<string, any>,
+  runtimeVars?: Record<string, any>
+): Promise<Record<string, VariableResolveResponse>> {
+  const res = await fetch(`${API_BASE_URL}/variables/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      template_vars: templateVars,
+      runtime_vars: runtimeVars,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to resolve variables");
+  }
+  return res.json();
+}
+
+// ── TEMPLATES ENGINE ───────────────────────────────────────────────────
+
+export interface Template {
+  id: string;
+  workspace_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  content: string;
+  template_type: string;
+  schema: string | null;
+  default_variables: string | null;
+  token_count: number;
+  usage_count: number;
+  is_pinned: number;
+  current_version: number;
+  metadata: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateVersion {
+  id: string;
+  template_id: string;
+  version_number: number;
+  content: string;
+  schema: string | null;
+  change_summary: string | null;
+  created_by: string;
+  created_at: string;
+}
+
+export interface TemplatePreviewResponse {
+  rendered: string;
+  detected_variables: string[];
+  token_count: number;
+}
+
+export async function fetchTemplates(workspaceId: string): Promise<Template[]> {
+  const res = await fetch(`${API_BASE_URL}/templates?workspace_id=${workspaceId}`);
+  if (!res.ok) throw new Error("Failed to fetch templates");
+  return res.json();
+}
+
+export async function fetchTemplate(workspaceId: string, templateId: string): Promise<Template> {
+  const res = await fetch(`${API_BASE_URL}/templates/${templateId}?workspace_id=${workspaceId}`);
+  if (!res.ok) throw new Error("Failed to fetch template details");
+  return res.json();
+}
+
+export async function createTemplate(
+  workspaceId: string,
+  data: {
+    title: string;
+    content: string;
+    description?: string | null;
+    template_type?: string;
+    schema_json?: string | null;
+    default_variables?: string | null;
+    is_pinned?: number;
+    metadata_json?: Record<string, any> | null;
+  }
+): Promise<Template> {
+  const res = await fetch(`${API_BASE_URL}/templates?workspace_id=${workspaceId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to create template");
+  }
+  return res.json();
+}
+
+export async function updateTemplate(
+  workspaceId: string,
+  templateId: string,
+  data: {
+    title?: string | null;
+    content?: string | null;
+    description?: string | null;
+    template_type?: string | null;
+    schema_json?: string | null;
+    default_variables?: string | null;
+    is_pinned?: number | null;
+    metadata_json?: Record<string, any> | null;
+    change_summary?: string | null;
+  }
+): Promise<Template> {
+  const res = await fetch(`${API_BASE_URL}/templates/${templateId}?workspace_id=${workspaceId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to update template");
+  }
+  return res.json();
+}
+
+export async function deleteTemplate(workspaceId: string, templateId: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/templates/${templateId}?workspace_id=${workspaceId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to delete template");
+  }
+}
+
+export async function fetchTemplateVersions(workspaceId: string, templateId: string): Promise<TemplateVersion[]> {
+  const res = await fetch(`${API_BASE_URL}/templates/${templateId}/versions?workspace_id=${workspaceId}`);
+  if (!res.ok) throw new Error("Failed to fetch template versions");
+  return res.json();
+}
+
+export async function previewTemplate(
+  workspaceId: string,
+  templateId: string,
+  data: {
+    template_vars?: Record<string, any>;
+    runtime_vars?: Record<string, any>;
+  }
+): Promise<TemplatePreviewResponse> {
+  const res = await fetch(`${API_BASE_URL}/templates/${templateId}/preview?workspace_id=${workspaceId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to preview template");
+  }
+  return res.json();
+}
+
+// ── HYBRID SEARCH & PALETTE ──────────────────────────────────────────
+
+export interface SearchResultItem {
+  id: string;
+  title: string;
+  type: string; // context | template | conversation
+  score: number;
+  subtitle: string | null;
+  description: string | null;
+}
+
+export interface SearchResponse {
+  results: SearchResultItem[];
+}
+
+export async function performHybridSearch(
+  workspaceId: string,
+  query: string,
+  limit = 10
+): Promise<SearchResponse> {
+  const res = await fetch(
+    `${API_BASE_URL}/search?workspace_id=${workspaceId}&q=${encodeURIComponent(query)}&limit=${limit}`
+  );
+  if (!res.ok) throw new Error("Failed to perform hybrid search");
+  return res.json();
+}
+
+
+
+
 

@@ -62,13 +62,20 @@ def _register_routers(app: FastAPI) -> None:
     from app.features.context.router import router as context_router
     from app.features.dependency.router import router as dependency_router
     from app.features.health.router import router as health_router
-    from app.features.tags_categories.router import (
-        router as tags_categories_router,
-    )
+    from app.features.tags_categories.router import router as tags_categories_router
     from app.features.workspace.router import router as workspace_router
     from app.features.favorite.router import router as favorite_router
     from app.features.settings.router import router as settings_router
     from app.features.provider.router import router as provider_router
+    from app.features.variables.router import router as variables_router
+    from app.features.templates.router import router as templates_router
+    from app.features.search.router import router as search_router
+    from app.features.conversation.router import router as conversation_router
+    from app.features.prompt.router import router as prompt_router
+    from app.features.auto.router import router as auto_router
+    from app.features.analytics.router import router as analytics_router
+    from app.features.jobs.router import router as jobs_router
+    from app.features.journals.router import router as journals_router
 
     app.include_router(health_router, prefix="/api/v1", tags=["Health"])
     app.include_router(workspace_router, prefix="/api/v1/workspaces", tags=["Workspaces"])
@@ -78,6 +85,15 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(favorite_router, prefix="/api/v1/workspaces/{workspace_id}/favorites", tags=["Favorites"])
     app.include_router(settings_router, prefix="/api/v1/settings", tags=["Settings"])
     app.include_router(provider_router, prefix="/api/v1/providers", tags=["Providers"])
+    app.include_router(variables_router, prefix="/api/v1/variables", tags=["Variables"])
+    app.include_router(templates_router, prefix="/api/v1/templates", tags=["Templates"])
+    app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
+    app.include_router(conversation_router, prefix="/api/v1/conversations", tags=["Conversations"])
+    app.include_router(prompt_router, prefix="/api/v1/prompts", tags=["Prompts"])
+    app.include_router(auto_router, prefix="/api/v1/auto", tags=["Auto AI"])
+    app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["Analytics"])
+    app.include_router(jobs_router, prefix="/api/v1/jobs", tags=["AI Background Jobs"])
+    app.include_router(journals_router, prefix="/api/v1/journals", tags=["Conversation Journals"])
 
 
 # Default app instance for uvicorn

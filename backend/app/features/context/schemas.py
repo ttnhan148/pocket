@@ -87,3 +87,18 @@ class ContextVersionResponse(BaseModel):
     title: str
     content: str
     created_at: datetime
+
+
+class ContextGenerateRequest(BaseModel):
+    """Request schema for generating context using AI."""
+
+    description: str = Field(..., min_length=5, description="Natural language description of the context to generate")
+
+
+class ContextSuggestRequest(BaseModel):
+    """Request schema for suggesting relevant contexts."""
+
+    draft_content: str = Field(..., min_length=1, description="Current prompt builder draft text")
+    already_selected_ids: list[str] | None = Field(default_factory=list, description="IDs of contexts already selected to exclude")
+    limit: int = Field(5, ge=1, le=20, description="Max number of suggestions to return")
+

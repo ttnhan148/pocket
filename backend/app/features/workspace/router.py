@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
@@ -133,3 +133,51 @@ async def delete_workspace(
     """Soft delete a workspace (cannot delete default workspace)."""
     service = WorkspaceService(db)
     await service.delete_workspace(workspace_id)
+
+
+@router.get(
+    "/{workspace_id}/export",
+    summary="Export workspace data as JSON",
+)
+async def export_workspace(
+    workspace_id: str,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> dict:
+    """Export all contexts, templates, and metadata from the workspace as a unified JSON snapshot."""
+    from app.features.workspace.import_export_service import ImportExportService
+    service = ImportExportService(db)
+    return await service.export_workspace(workspace_id)
+
+
+@router.post(
+    "/{workspace_id}/import",
+    summary="Import workspace JSON backup",
+)
+async def import_workspace(
+    workspace_id: str,
+    data: dict,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> dict:
+    """Import contexts and templates into a workspace from a previously exported JSON backup."""
+    from app.features.workspace.import_export_service import ImportExportService
+    service = ImportExportService(db)
+    result = await service.import_workspace_json(workspace_id, data)
+    return {"status": "success", **result}
+
+
+@router.post(
+    "/{workspace_id}/import/markdown",
+    summary="Import context from markdown file",
+)
+async def import_markdown(
+    workspace_id: str,
+    file: UploadFile = File(...),
+    db: Annotated[AsyncSession, Depends(get_session)] = None,
+) -> dict:
+    """Parse YAML frontmatter and markdown body from an uploaded file to import as a Context."""
+    from app.features.workspace.import_export_service import ImportExportService
+    contents = (await file.read()).decode("utf-8")
+    service = ImportExportService(db)
+    context = await service.import_context_markdown(workspace_id, file.filename, contents)
+    return {"status": "success", "context_id": context.id, "title": context.title}
+

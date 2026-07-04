@@ -17,6 +17,10 @@ interface WorkspaceContextType {
   toggleSidebar: () => void;
   mobileSidebarOpen: boolean;
   setMobileSidebarOpen: (open: boolean) => void;
+  // Command Palette state
+  commandPaletteOpen: boolean;
+  setCommandPaletteOpen: (open: boolean) => void;
+  toggleCommandPalette: () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
@@ -25,6 +29,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkspaceId, setActiveWorkspaceIdState] = useState<string>("");
   const [sidebarCollapsed, setSidebarCollapsedState] = useState<boolean>(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
 
   const { data: workspaces = [], isLoading, refetch } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
@@ -76,6 +81,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("pocket-sidebar-collapsed", nextVal ? "true" : "false");
   };
 
+  const toggleCommandPalette = () => {
+    setCommandPaletteOpen((prev) => !prev);
+  };
+
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || null;
 
   return (
@@ -92,6 +101,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         toggleSidebar,
         mobileSidebarOpen,
         setMobileSidebarOpen,
+        commandPaletteOpen,
+        setCommandPaletteOpen,
+        toggleCommandPalette,
       }}
     >
       {children}

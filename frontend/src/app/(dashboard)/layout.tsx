@@ -2,6 +2,7 @@
 
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import CommandPalette from "@/components/layout/command-palette";
 import { useWorkspace } from "@/lib/workspace-context";
 import { useGlobalKeyboard } from "@/hooks/use-keyboard";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,9 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen flex bg-bg-primary text-text-primary">
+      {/* Command Palette */}
+      <CommandPalette />
+
       {/* Navigation Sidebar */}
       <Sidebar />
 

@@ -24,8 +24,11 @@ from app.models.settings import Favorite, Setting
 from app.models.template import Template, TemplateVariable, TemplateVersion
 from app.models.variable import Variable, WorkspaceVariable
 from app.models.workspace import Workspace, WorkspaceSettings
+from app.models.ai_job import AIJob, AIJobResult
 
 __all__ = [
+    "AIJob",
+    "AIJobResult",
     "AnalyticsEvent",
     "AuditLog",
     "Base",

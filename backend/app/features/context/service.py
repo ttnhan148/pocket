@@ -222,3 +222,18 @@ class ContextService(BaseService):
     async def search_contexts(self, workspace_id: str, query: str) -> list[Context]:
         """Full text search contexts within a workspace."""
         return await self.repo.search(workspace_id, query)
+
+    async def update_scores(
+        self, context_id: str, delta_confidence: float, delta_usage: int
+    ) -> Context:
+        """Update context confidence and usage scores based on learning feedback."""
+        stmt = select(Context).where(Context.id == context_id, Context.deleted_at.is_(None))
+        res = await self.db.execute(stmt)
+        context = res.scalar_one_or_none()
+        if not context:
+            raise NotFoundError("Context", context_id)
+        
+        context.confidence = max(0.0, min(1.0, context.confidence + delta_confidence))
+        context.usage_count += delta_usage
+        await self.db.flush()
+        return context

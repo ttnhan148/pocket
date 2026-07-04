@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, BackgroundTasks
+from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
@@ -13,8 +16,11 @@ from app.features.context.schemas import (
     ContextResponse,
     ContextUpdate,
     ContextVersionResponse,
+    ContextGenerateRequest,
+    ContextSuggestRequest,
 )
 from app.features.context.service import ContextService
+from app.features.context.ai_service import AIContextService
 
 router = APIRouter()
 
@@ -81,6 +87,138 @@ async def search_contexts(
     return [ContextResponse.model_validate(c) for c in contexts]
 
 
+@router.post(
+    "/generate",
+    response_model=ContextResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Generate a new context using AI",
+)
+async def generate_context(
+    workspace_id: str,
+    data: ContextGenerateRequest,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> ContextResponse:
+    """Generate context metadata and markdown contents from a natural language description using LLM."""
+    from app.config import Settings
+    from app.ai.client import AzureAIClient
+    settings = Settings()
+    ai_client = AzureAIClient(settings)
+    service = AIContextService(db, ai_client, settings)
+    context = await service.generate_context(workspace_id, data.description)
+    return ContextResponse.model_validate(context)
+
+
+@router.post(
+    "/suggest",
+    response_model=list[ContextResponse],
+    summary="Suggest semantically relevant contexts for prompt builder",
+)
+async def suggest_contexts(
+    workspace_id: str,
+    data: ContextSuggestRequest,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> list[ContextResponse]:
+    """Identify and return active contexts from the workspace that match prompt builder draft text."""
+    from app.config import Settings
+    from app.ai.client import AzureAIClient
+    settings = Settings()
+    ai_client = AzureAIClient(settings)
+    service = AIContextService(db, ai_client, settings)
+    suggestions = await service.suggest_contexts(
+        workspace_id,
+        data.draft_content,
+        data.already_selected_ids,
+        data.limit,
+    )
+    return [ContextResponse.model_validate(s) for s in suggestions]
+
+
+class ContextHealthResponse(BaseModel):
+    """Response schema for context health evaluation."""
+
+    context_id: str
+    overall_health: float
+    freshness_score: float | None = None
+    usage_score: float | None = None
+    quality_score: float | None = None
+    relevance_score: float | None = None
+    issues: list[str] = []
+    recommendations: list[str] = []
+    evaluated_at: datetime
+
+
+@router.post(
+    "/health-check",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Run AI Context Health Check",
+)
+async def run_health_check(
+    workspace_id: str,
+    background_tasks: BackgroundTasks,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> dict:
+    """Trigger a background job to scan all contexts and calculate freshness, usage, quality, and relevance."""
+    from app.features.jobs.service import AIJobService
+    from app.features.jobs.runner import run_context_health_check
+
+    job_service = AIJobService(db)
+    job = await job_service.create_job(job_type="health_check", input_data={"workspace_id": workspace_id})
+    background_tasks.add_task(run_context_health_check, job.id, workspace_id)
+    return {"job_id": job.id, "status": "pending"}
+
+
+@router.get(
+    "/health-scores",
+    response_model=list[ContextHealthResponse],
+    summary="Get context health scores",
+)
+async def get_health_scores(
+    workspace_id: str,
+    db: Annotated[AsyncSession, Depends(get_session)],
+) -> list[dict]:
+    """Retrieve the latest health scores for all contexts in the workspace."""
+    from app.models import Context, ContextHealthScore
+    import json
+
+    stmt = (
+        select(ContextHealthScore)
+        .join(Context, Context.id == ContextHealthScore.context_id)
+        .where(Context.workspace_id == workspace_id, Context.deleted_at.is_(None))
+        .order_by(ContextHealthScore.evaluated_at.desc())
+    )
+    res = await db.execute(stmt)
+    records = res.scalars().all()
+
+    seen_ctx_ids = set()
+    latest_records = []
+    for r in records:
+        if r.context_id not in seen_ctx_ids:
+            seen_ctx_ids.add(r.context_id)
+            try:
+                issues = json.loads(r.issues) if r.issues else []
+            except Exception:
+                issues = []
+            try:
+                recs = json.loads(r.recommendations) if r.recommendations else []
+            except Exception:
+                recs = []
+
+            latest_records.append({
+                "context_id": r.context_id,
+                "overall_health": r.overall_health,
+                "freshness_score": r.freshness_score,
+                "usage_score": r.usage_score,
+                "quality_score": r.quality_score,
+                "relevance_score": r.relevance_score,
+                "issues": issues,
+                "recommendations": recs,
+                "evaluated_at": r.evaluated_at,
+            })
+
+    return latest_records
+
+
+
 @router.get(
     "/{context_id}",
     response_model=ContextResponse,
@@ -143,3 +281,8 @@ async def get_context_versions(
     service = ContextService(db)
     versions = await service.list_versions(workspace_id, context_id)
     return [ContextVersionResponse.model_validate(v) for v in versions]
+
+
+
+
+

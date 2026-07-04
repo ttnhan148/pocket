@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useWorkspace } from "@/lib/workspace-context";
-import { Menu, ChevronRight, Home } from "lucide-react";
+import { Menu, ChevronRight, Home, Search } from "lucide-react";
 import React from "react";
 
 interface HeaderProps {
@@ -12,7 +12,7 @@ interface HeaderProps {
 
 export default function Header({ actions }: HeaderProps) {
   const pathname = usePathname();
-  const { setMobileSidebarOpen } = useWorkspace();
+  const { setMobileSidebarOpen, setCommandPaletteOpen } = useWorkspace();
 
   const getBreadcrumbs = () => {
     if (pathname === "/") {
@@ -67,9 +67,24 @@ export default function Header({ actions }: HeaderProps) {
         </nav>
       </div>
 
-      {/* Right side: Header actions (passed down as children/slots) */}
-      <div className="flex items-center gap-2 shrink-0">
-        {actions}
+      {/* Right side: Search button & Header actions */}
+      <div className="flex items-center gap-3 shrink-0">
+        <button
+          onClick={() => setCommandPaletteOpen(true)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border-default/40 bg-bg-secondary/60 hover:bg-bg-hover text-text-tertiary hover:text-text-secondary text-xs transition-all cursor-pointer select-none font-medium shadow-xs"
+        >
+          <Search className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Search...</span>
+          <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 border border-border-default/30 rounded bg-bg-primary text-[9px] font-sans">
+            Ctrl+K
+          </kbd>
+        </button>
+
+        {actions && (
+          <div className="flex items-center gap-2 border-l border-border-default/45 pl-3">
+            {actions}
+          </div>
+        )}
       </div>
     </header>
   );

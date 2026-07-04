@@ -6,7 +6,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 
 export function useGlobalKeyboard() {
   const router = useRouter();
-  const { toggleSidebar } = useWorkspace();
+  const { toggleSidebar, toggleCommandPalette } = useWorkspace();
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -19,12 +19,18 @@ export function useGlobalKeyboard() {
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.isContentEditable ||
-        target.className.includes("input") ||
-        target.className.includes("textarea") ||
-        target.className.includes("monaco");
+        target.className?.includes?.("input") ||
+        target.className?.includes?.("textarea") ||
+        target.className?.includes?.("monaco");
 
       // Global shortcuts
       if (isCtrl) {
+        if (e.key === "k") {
+          e.preventDefault();
+          toggleCommandPalette();
+          return;
+        }
+
         if (e.key === "\\") {
           e.preventDefault();
           toggleSidebar();
