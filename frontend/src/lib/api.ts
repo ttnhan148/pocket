@@ -293,3 +293,184 @@ export async function fetchDependencyGraph(workspaceId: string): Promise<Depende
   if (!res.ok) throw new Error("Failed to fetch dependency graph");
   return res.json();
 }
+
+export interface Favorite {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function fetchFavorites(workspaceId: string): Promise<Favorite[]> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/favorites`);
+  if (!res.ok) throw new Error("Failed to fetch favorites");
+  return res.json();
+}
+
+export async function toggleFavorite(
+  workspaceId: string,
+  entityType: string,
+  entityId: string
+): Promise<Favorite | null> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/favorites/toggle`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ entity_type: entityType, entity_id: entityId }),
+  });
+  if (!res.ok) throw new Error("Failed to toggle favorite status");
+  return res.json();
+}
+
+export async function reorderFavorites(
+  workspaceId: string,
+  orderedIds: string[]
+): Promise<Favorite[]> {
+  const res = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}/favorites/reorder`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(orderedIds),
+  });
+  if (!res.ok) throw new Error("Failed to reorder favorites");
+  return res.json();
+}
+
+// ── Settings ──────────────────────────────────────────────────────────
+export interface Setting {
+  key: string;
+  value: string;
+  value_type: string;
+  category: string;
+  description: string | null;
+  updated_at: string;
+}
+
+export async function fetchSettings(): Promise<Setting[]> {
+  const res = await fetch(`${API_BASE_URL}/settings`);
+  if (!res.ok) throw new Error("Failed to fetch settings");
+  return res.json();
+}
+
+export async function updateSettings(updates: { key: string; value: string }[]): Promise<Setting[]> {
+  const res = await fetch(`${API_BASE_URL}/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ updates }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to update settings");
+  }
+  return res.json();
+}
+
+// ── Providers ─────────────────────────────────────────────────────────
+export interface Provider {
+  id: string;
+  name: string;
+  provider_type: string;
+  endpoint: string;
+  api_version: string;
+  deployment_chat: string | null;
+  deployment_chat_mini: string | null;
+  deployment_embedding: string | null;
+  is_default: number;
+  is_active: number;
+  api_key?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProviderCreate {
+  name: string;
+  provider_type: string;
+  endpoint: string;
+  api_version: string;
+  deployment_chat?: string | null;
+  deployment_chat_mini?: string | null;
+  deployment_embedding?: string | null;
+  api_key: string;
+  is_active?: number;
+}
+
+export interface ProviderUpdate {
+  name?: string;
+  provider_type?: string;
+  endpoint?: string;
+  api_version?: string;
+  deployment_chat?: string | null;
+  deployment_chat_mini?: string | null;
+  deployment_embedding?: string | null;
+  api_key?: string;
+  is_active?: number;
+}
+
+export interface ProviderTestResponse {
+  success: boolean;
+  message: string;
+  latency_ms: number | null;
+}
+
+export async function fetchProviders(): Promise<Provider[]> {
+  const res = await fetch(`${API_BASE_URL}/providers`);
+  if (!res.ok) throw new Error("Failed to fetch providers");
+  return res.json();
+}
+
+export async function createProvider(data: ProviderCreate): Promise<Provider> {
+  const res = await fetch(`${API_BASE_URL}/providers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to create provider");
+  }
+  return res.json();
+}
+
+export async function updateProvider(id: string, data: ProviderUpdate): Promise<Provider> {
+  const res = await fetch(`${API_BASE_URL}/providers/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to update provider");
+  }
+  return res.json();
+}
+
+export async function deleteProvider(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/providers/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to delete provider");
+  }
+}
+
+export async function setDefaultProvider(id: string): Promise<Provider> {
+  const res = await fetch(`${API_BASE_URL}/providers/${id}/default`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to set default provider");
+  }
+  return res.json();
+}
+
+export async function testProvider(id: string): Promise<ProviderTestResponse> {
+  const res = await fetch(`${API_BASE_URL}/providers/${id}/test`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to test connection");
+  return res.json();
+}
+
+

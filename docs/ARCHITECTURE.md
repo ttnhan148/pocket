@@ -1052,32 +1052,38 @@ graph TD
 
 ### 9.2 Endpoint Catalog
 
+> [!NOTE]
+> To enforce strict workspace isolation, core features (Contexts, Dependencies, Tags, Categories, Favorites) are registered under workspace-prefixed paths: `/api/v1/workspaces/{workspace_id}/...`.
+
 #### Workspaces
 ```
 GET     /api/v1/workspaces                    List all workspaces
 POST    /api/v1/workspaces                    Create workspace
-GET     /api/v1/workspaces/:id                Get workspace
-PATCH   /api/v1/workspaces/:id                Update workspace
-DELETE  /api/v1/workspaces/:id                Soft-delete workspace
-GET     /api/v1/workspaces/:id/stats          Get workspace statistics
+GET     /api/v1/workspaces/{id}                Get workspace
+PUT     /api/v1/workspaces/{id}                Update workspace
+DELETE  /api/v1/workspaces/{id}                Soft-delete workspace
 ```
 
 #### Contexts
 ```
-GET     /api/v1/contexts                      List contexts (filter by workspace)
-POST    /api/v1/contexts                      Create context
-GET     /api/v1/contexts/:id                  Get context with metadata
-PATCH   /api/v1/contexts/:id                  Update context (creates version)
-DELETE  /api/v1/contexts/:id                  Soft-delete context
-GET     /api/v1/contexts/:id/versions         List context versions
-GET     /api/v1/contexts/:id/versions/:ver    Get specific version
-POST    /api/v1/contexts/:id/restore/:ver     Restore to specific version
-GET     /api/v1/contexts/:id/dependencies     Get context dependencies
-POST    /api/v1/contexts/:id/dependencies     Add dependency
-DELETE  /api/v1/contexts/:id/dependencies/:dep_id  Remove dependency
-GET     /api/v1/contexts/:id/graph            Get dependency graph (for visualization)
-POST    /api/v1/contexts/:id/embed            Trigger re-embedding
-GET     /api/v1/contexts/:id/health           Get health score
+GET     /api/v1/workspaces/{workspace_id}/contexts                      List contexts
+POST    /api/v1/workspaces/{workspace_id}/contexts                      Create context
+GET     /api/v1/workspaces/{workspace_id}/contexts/{id}                  Get context with metadata
+PUT     /api/v1/workspaces/{workspace_id}/contexts/{id}                  Update context (creates version)
+DELETE  /api/v1/workspaces/{workspace_id}/contexts/{id}                  Soft-delete context
+GET     /api/v1/workspaces/{workspace_id}/contexts/{id}/versions         List context versions
+GET     /api/v1/workspaces/{workspace_id}/contexts/{id}/versions/{ver}    Get specific version
+POST    /api/v1/workspaces/{workspace_id}/contexts/{id}/restore/{ver}     Restore to specific version
+POST    /api/v1/workspaces/{workspace_id}/contexts/{id}/embed            Trigger re-embedding
+GET     /api/v1/workspaces/{workspace_id}/contexts/{id}/health           Get health score
+```
+
+#### Context Dependencies
+```
+GET     /api/v1/workspaces/{workspace_id}/contexts/{id}/dependencies     Get context dependencies
+POST    /api/v1/workspaces/{workspace_id}/contexts/{id}/dependencies     Add dependency
+DELETE  /api/v1/workspaces/{workspace_id}/contexts/{id}/dependencies/{dep_id}  Remove dependency
+GET     /api/v1/workspaces/{workspace_id}/dependency-graph               Get dependency graph
 ```
 
 #### Templates
@@ -1157,11 +1163,9 @@ GET     /api/v1/analytics/contexts/dead       Unused contexts
 ```
 
 #### Favorites
-```
-GET     /api/v1/favorites                     List all favorites
-POST    /api/v1/favorites                     Add favorite
-DELETE  /api/v1/favorites/:id                 Remove favorite
-PATCH   /api/v1/favorites/reorder             Reorder favorites
+GET     /api/v1/workspaces/{workspace_id}/favorites          List all favorites
+POST    /api/v1/workspaces/{workspace_id}/favorites/toggle   Toggle favorite status
+PUT     /api/v1/workspaces/{workspace_id}/favorites/reorder  Reorder favorites
 ```
 
 #### Journals
@@ -1176,17 +1180,18 @@ DELETE  /api/v1/journals/:id                  Soft-delete journal
 #### Settings
 ```
 GET     /api/v1/settings                      Get all settings
-PATCH   /api/v1/settings                      Update settings (batch)
-GET     /api/v1/settings/:key                 Get single setting
+PUT     /api/v1/settings                      Update settings (bulk)
+GET     /api/v1/settings/{key}                Get single setting
 ```
 
 #### Providers
 ```
 GET     /api/v1/providers                     List providers
 POST    /api/v1/providers                     Create provider
-PATCH   /api/v1/providers/:id                 Update provider
-DELETE  /api/v1/providers/:id                 Delete provider
-POST    /api/v1/providers/:id/test            Test provider connection
+PUT     /api/v1/providers/{id}                Update provider
+DELETE  /api/v1/providers/{id}                Delete provider
+POST    /api/v1/providers/{id}/default        Set default provider
+POST    /api/v1/providers/{id}/test           Test provider connection
 ```
 
 #### Import/Export

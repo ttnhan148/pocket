@@ -66,12 +66,18 @@ def _register_routers(app: FastAPI) -> None:
         router as tags_categories_router,
     )
     from app.features.workspace.router import router as workspace_router
+    from app.features.favorite.router import router as favorite_router
+    from app.features.settings.router import router as settings_router
+    from app.features.provider.router import router as provider_router
 
     app.include_router(health_router, prefix="/api/v1", tags=["Health"])
     app.include_router(workspace_router, prefix="/api/v1/workspaces", tags=["Workspaces"])
     app.include_router(context_router, prefix="/api/v1/workspaces/{workspace_id}/contexts", tags=["Contexts"])
     app.include_router(dependency_router, prefix="/api/v1/workspaces/{workspace_id}", tags=["Dependencies"])
     app.include_router(tags_categories_router, prefix="/api/v1/workspaces/{workspace_id}", tags=["Tags & Categories"])
+    app.include_router(favorite_router, prefix="/api/v1/workspaces/{workspace_id}/favorites", tags=["Favorites"])
+    app.include_router(settings_router, prefix="/api/v1/settings", tags=["Settings"])
+    app.include_router(provider_router, prefix="/api/v1/providers", tags=["Providers"])
 
 
 # Default app instance for uvicorn

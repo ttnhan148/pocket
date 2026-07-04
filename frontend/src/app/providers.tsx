@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "@/components/layout/theme-provider";
+import { WorkspaceProvider } from "@/lib/workspace-context";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -18,7 +20,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <ThemeProvider>
+        <WorkspaceProvider>
+          {children}
+        </WorkspaceProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

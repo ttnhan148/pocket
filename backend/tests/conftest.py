@@ -71,6 +71,22 @@ async def _create_fts_tables(conn: Any) -> None:
     """))
 
 
+async def _seed_settings(conn: Any) -> None:
+    """Seed default settings into the in-memory database."""
+    from datetime import datetime, UTC
+    now = datetime.now(UTC)
+    await conn.execute(sa.text("""
+        INSERT INTO settings (key, value, value_type, category, description, updated_at) VALUES
+        ('auto_embed', 'true', 'boolean', 'ai', 'Automatically generate embeddings for contexts', :now),
+        ('auto_tag', 'true', 'boolean', 'ai', 'Automatically suggest tags for new contexts', :now),
+        ('learning_enabled', 'true', 'boolean', 'ai', 'Enable post-conversation learning loop', :now),
+        ('theme', 'dark', 'text', 'ui', 'Application theme (light or dark)', :now),
+        ('default_model', 'gpt-4.1', 'text', 'ai', 'Default model for chat completions', :now),
+        ('token_limit', '128000', 'number', 'ai', 'Default token budget limit', :now),
+        ('search_top_k', '10', 'number', 'search', 'Number of contexts to retrieve by default', :now)
+    """), {"now": now})
+
+
 @pytest_asyncio.fixture
 async def client(test_settings: Settings) -> AsyncIterator[AsyncClient]:
     """Async HTTP client for testing API endpoints."""
@@ -79,6 +95,7 @@ async def client(test_settings: Settings) -> AsyncIterator[AsyncClient]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await _create_fts_tables(conn)
+        await _seed_settings(conn)
 
     app = create_app(settings=test_settings)
     transport = ASGITransport(app=app)
@@ -99,6 +116,7 @@ async def db_session(test_settings: Settings) -> AsyncIterator[AsyncSession]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await _create_fts_tables(conn)
+        await _seed_settings(conn)
 
     session_factory = async_sessionmaker(
         bind=engine,

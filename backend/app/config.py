@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     auto_tag: bool = True
     learning_enabled: bool = True
     ai_optimization_enabled: bool = True
+    encryption_key: str = ""
 
     @property
     def database_url(self) -> str:

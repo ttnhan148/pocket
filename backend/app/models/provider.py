@@ -22,4 +22,5 @@ class Provider(BaseModel):
     deployment_embedding: Mapped[str | None] = mapped_column(String(100), nullable=True)
     is_default: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column("metadata", Text, nullable=True)

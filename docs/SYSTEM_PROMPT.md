@@ -708,10 +708,10 @@ Prompts:        POST                   /api/v1/prompts/compile, validate, optimi
 Search:         POST                   /api/v1/search (+ contexts, semantic, suggest)
 AI Features:    POST                   /api/v1/ai/* (enhance, critique, auto-tag, etc.)
 Analytics:      GET                    /api/v1/analytics/* (dashboard, usage, costs, trends)
-Favorites:      GET/POST/DELETE/PATCH  /api/v1/favorites
+Favorites:      GET/POST/PUT           /api/v1/workspaces/{workspace_id}/favorites (+ toggle, reorder)
 Journals:       GET/POST/PATCH/DELETE  /api/v1/journals
-Settings:       GET/PATCH              /api/v1/settings
-Providers:      GET/POST/PATCH/DELETE  /api/v1/providers (+ test)
+Settings:       GET/PUT                /api/v1/settings
+Providers:      GET/POST/PUT/DELETE    /api/v1/providers (+ test, default)
 Import/Export:  POST/GET               /api/v1/import/*, /api/v1/export/*
 ```
 

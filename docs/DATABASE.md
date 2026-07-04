@@ -630,11 +630,12 @@ CREATE TABLE providers (
     deployment_embedding TEXT,                    -- Embedding model deployment name
     is_default      INTEGER NOT NULL DEFAULT 0,
     is_active       INTEGER NOT NULL DEFAULT 1,
+    api_key_encrypted TEXT,                       -- Encrypted API key using Fernet key from env
     metadata        TEXT,
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
--- Note: API keys stored in .env, NEVER in database
+-- Note: API keys are symmetrically encrypted using POCKET_ENCRYPTION_KEY from env before being persisted.
 ```
 
 ---
