@@ -24,9 +24,9 @@ CURRENT_DIR=$(pwd)
 echo -e "\n${BLUE}[1/6] Installing system dependencies (Requires sudo)...${NC}"
 if [ -x "$(command -v apt-get)" ]; then
     sudo apt-get update
-    sudo apt-get install -y python3 python3-pip python3-venv sqlite3 curl git
+    sudo apt-get install -y python3 python3-pip python3-venv sqlite3 curl git unzip
 elif [ -x "$(command -v yum)" ]; then
-    sudo yum install -y python3 python3-pip sqlite3 curl git
+    sudo yum install -y python3 python3-pip sqlite3 curl git unzip
 else
     echo -e "${YELLOW}Warning: Unknown package manager. Please ensure Python3, venv, and sqlite3 are installed.${NC}"
 fi
