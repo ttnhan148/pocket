@@ -54,6 +54,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # ── Register routers ─────────────────────────────────────────────
     _register_routers(app)
 
+    # ── Serve Frontend Static Files ──────────────────────────────────
+    import os
+    from fastapi.responses import FileResponse
+
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+
+    @app.get("/{rest_of_path:path}")
+    async def serve_frontend(rest_of_path: str):
+        if (
+            rest_of_path.startswith("api/")
+            or rest_of_path.startswith("docs")
+            or rest_of_path.startswith("redoc")
+            or rest_of_path.startswith("openapi.json")
+        ):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not Found")
+
+        if not os.path.exists(static_dir):
+            return {"message": "Pocket Single-Deploy: Static frontend directory not found. Please build frontend first."}
+
+        # Check if requested path is a real file inside static_dir
+        file_path = os.path.join(static_dir, rest_of_path)
+        if rest_of_path and os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+        # Fallback to index.html for client-side routing
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        return {"message": "Pocket Single-Deploy: index.html not found inside static directory."}
+
     return app
 
 

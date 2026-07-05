@@ -1407,147 +1407,72 @@ This document defines the complete implementation roadmap for Pocket. It contain
 
 ---
 
-## Phase 7: Testing & Quality (M46–M48)
+## Phase 7: Single-Deploy Architecture & Testing (M46–M48)
 
-### M46 — Unit & Integration Test Suite
-
-**Goal:** Comprehensive test coverage ≥ 90%.
-
+### M46 — Single-Deploy Architecture
+**Goal:** Configure Next.js static HTML export and mount static assets directly in FastAPI for a monolithic single-process deployment.
 **Deliverables:**
-- Backend: pytest test suite for all services, repositories, pipeline steps
-- Frontend: Vitest + React Testing Library for all components
-- Test fixtures and factories
-- Coverage reports
-
+- Next.js static export config in `frontend/next.config.ts` (with `unoptimized` images).
+- FastAPI static serving and client-side SPA routing fallback in `backend/app/main.py`.
+- Automated build and copying pipeline script `build_single_deploy.py`.
 **Acceptance Criteria:**
-- Backend coverage ≥ 90%
-- Frontend coverage ≥ 90%
-- All critical paths covered (CRUD, pipeline, validation, ranking)
-- Test data factories for each entity
-- CI-ready test execution
-
-**Test Strategy:** This IS the test strategy.
-
-**Dependencies:** All previous milestones
-
-**Definition of Done:**
-- Coverage reports show ≥ 90%
-- All tests pass
+- `python build_single_deploy.py` successfully builds Next.js and copies files to `backend/app/static/`.
+- Router handles client-side Next.js routes (e.g. `/contexts`) and falls back to `index.html`.
+- Standard API endpoints remain protected and do not load static HTML on missing routes.
 
 ---
 
-### M47 — E2E Tests
-
-**Goal:** End-to-end tests for all critical user flows.
-
+### M47 — Backend Coverage & Unit Testing
+**Goal:** Measure test coverage and test core database constraints and markdown parsers.
 **Deliverables:**
-- Playwright test suite
-- Critical user flows tested:
-  - Create workspace → create context → build prompt → chat
-  - Search → find context → edit → verify update
-  - Import contexts → verify in library
-  - Prompt builder → validate → fix errors → compile → chat
-  - Graph explorer interactions
-
+- `pytest-cov` configured for backend.
+- Unit tests for SPA router and fallback endpoints in `backend/tests/test_single_deploy.py`.
+- Unit tests for YAML frontmatter parser and DB constraints in `backend/tests/test_logical_units.py`.
 **Acceptance Criteria:**
-- All critical flows automated
-- Tests run against dev server (backend + frontend)
-- Screenshots captured on failure
-- Test isolation (fresh DB per test)
-
-**Test Strategy:** This IS the test strategy.
-
-**Dependencies:** M46
-
-**Definition of Done:**
-- All E2E tests pass
-- CI-ready
+- Backend coverage measured successfully.
+- Markdown parsing variations correctly create contexts with parsed metadata (priority, context_type, tags).
+- Database constraint violations (slug NOT NULL checks) tested.
 
 ---
 
-### M48 — Prompt Regression Tests
-
-**Goal:** Ensure prompt quality doesn't degrade across changes.
-
+### M48 — Frontend Component Testing
+**Goal:** Setup unit and component testing for Next.js frontend components.
 **Deliverables:**
-- Golden prompt test suite
-- Same inputs always produce same structure/quality prompts
-- Prompt scoring regression (score shouldn't decrease)
-
+- Vitest and React Testing Library setup in `frontend/vitest.config.ts` and `frontend/vitest.setup.ts`.
+- Component tests for layout and DAG views in `frontend/src/components/__tests__/DependencyGraphView.test.tsx`.
+- Unit tests for styling utility in `frontend/src/lib/utils.test.ts`.
 **Acceptance Criteria:**
-- 20 golden test cases (input → expected prompt structure)
-- Regression detected if compiled prompt structure changes unexpectedly
-- Score regression detected if average score drops > 5%
-
-**Test Strategy:** Snapshot testing with approved baselines.
-
-**Dependencies:** M32
-
-**Definition of Done:**
-- Golden test suite established with baselines
+- `bunx vitest run` runs successfully.
+- ReactFlow canvas mock renders node and edge listings correctly without browser DOM crashes.
 
 ---
 
-## Phase 8: Polish & Release (M49–M50)
+## Phase 8: E2E Testing & Release Packaging (M49–M50)
 
-### M49 — Performance Optimization
-
-**Goal:** Optimize for speed and responsiveness.
-
+### M49 — Full-Stack E2E Testing (Playwright)
+**Goal:** Set up browser E2E tests executing against the unified Single-Deploy FastAPI server.
 **Deliverables:**
-- Backend: Query optimization (EXPLAIN QUERY PLAN on all queries)
-- Backend: Connection pooling tuning
-- Frontend: Bundle size analysis and optimization
-- Frontend: Lazy loading for heavy components (Monaco, ReactFlow)
-- Database: Index verification
-- Caching: Implement caching where needed
-
+- Playwright installation and config in `frontend/playwright.config.ts`.
+- Playwright E2E browser tests in `frontend/e2e/single_deploy.spec.ts`.
 **Acceptance Criteria:**
-- Page loads < 2 seconds
-- API responses < 200ms (non-AI endpoints)
-- AI pipeline < 15 seconds end-to-end
-- Frontend bundle < 500KB initial load
-- No N+1 queries
-- Lazy loading for Monaco Editor and Graph
-
-**Test Strategy:**
-- Performance benchmarks with timing assertions
-- Bundle analysis report
-
-**Dependencies:** All previous milestones
-
-**Definition of Done:**
-- Performance benchmarks met
-- No N+1 queries
-- Bundle optimized
+- Playwright webServer successfully boots uvicorn server at port 8000 and waits for health check before running.
+- E2E tests verify the welcome dashboard renders correctly and navigate successfully to `/contexts`.
 
 ---
 
-### M50 — Final Polish & Documentation
-
-**Goal:** Final UI polish, documentation, and release preparation.
-
+### M50 — Release Packaging & Monolithic Dockerfile
+**Goal:** Package Next.js and FastAPI together into a single distributable Docker image and document setup guides.
 **Deliverables:**
-- Final UI review against UI_GUIDELINES.md
-- All empty, loading, error states verified
-- Keyboard shortcuts verified
-- README.md with setup instructions
-- Contributing guide
-- API documentation (auto-generated from FastAPI)
-- Final QA pass
-
+- Multi-stage monolithic `Dockerfile` at root.
+- User deployment documentation in `docs/SINGLE_DEPLOY_GUIDE.md`.
 **Acceptance Criteria:**
-- Every page matches UI_GUIDELINES.md design specifications
-- All keyboard shortcuts working
-- All animations smooth and purposeful
-- No console errors or warnings
-- README covers: prerequisites, setup, running, configuration
+- Dockerfile builds successfully using bun for frontend compilations and python-slim for runner execution.
+- Guide details local uvicorn execution and persistent Docker SQLite storage.
 - FastAPI auto-docs accessible at `/docs`
 - All features from the brief implemented and verified
 
 **Test Strategy:**
 - Manual QA checklist
-- Visual comparison against UI_GUIDELINES.md
 
 **Dependencies:** M49
 
@@ -1570,8 +1495,8 @@ This document defines the complete implementation roadmap for Pocket. It contain
 | **Phase 4** | M25–M32 | Prompt engine: pipeline, validation, scoring |
 | **Phase 5** | M33–M40 | Conversations, AI features, analytics |
 | **Phase 6** | M41–M45 | Advanced AI, journals, import/export |
-| **Phase 7** | M46–M48 | Testing (unit, integration, E2E, regression) |
-| **Phase 8** | M49–M50 | Performance optimization and release |
+| **Phase 7** | M46–M48 | Single-Deploy Architecture & Testing |
+| **Phase 8** | M49–M50 | E2E Testing & Release Packaging |
 
 ---
 
