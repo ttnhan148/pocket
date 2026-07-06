@@ -4,6 +4,8 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchWorkspaces, Workspace } from "./api";
 
+import CreateWorkspaceModal from "@/components/layout/create-workspace-modal";
+
 interface WorkspaceContextType {
   activeWorkspaceId: string;
   setActiveWorkspaceId: (id: string) => void;
@@ -21,6 +23,9 @@ interface WorkspaceContextType {
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean) => void;
   toggleCommandPalette: () => void;
+  // Create Workspace Modal state
+  showCreateModal: boolean;
+  setShowCreateModal: (open: boolean) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
@@ -30,6 +35,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsedState] = useState<boolean>(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState<boolean>(false);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
 
   const { data: workspaces = [], isLoading, refetch } = useQuery<Workspace[]>({
     queryKey: ["workspaces"],
@@ -104,9 +110,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         commandPaletteOpen,
         setCommandPaletteOpen,
         toggleCommandPalette,
+        showCreateModal,
+        setShowCreateModal,
       }}
     >
       {children}
+      <CreateWorkspaceModal />
     </WorkspaceContext.Provider>
   );
 }

@@ -19,7 +19,7 @@ import { motion } from "framer-motion";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 
 export default function DashboardPage() {
-  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspace, setShowCreateModal } = useWorkspace();
 
   const { data: contexts = [], isLoading: isLoadingContexts } = useQuery<Context[]>({
     queryKey: ["contexts", activeWorkspaceId],
@@ -86,6 +86,13 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex gap-3 shrink-0">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-border-default hover:bg-bg-hover text-text-primary transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4 text-accent" />
+            <span>New Workspace</span>
+          </button>
           <Link
             href="/contexts?create=true"
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-accent hover:bg-accent-hover text-text-inverse transition-colors"
