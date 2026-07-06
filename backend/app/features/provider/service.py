@@ -124,14 +124,16 @@ class ProviderService(BaseService):
         """Verify endpoint connectivity and return results."""
         provider = await self.repo.get_or_raise(id_)
         
-        # Build headers and request parameters for Azure OpenAI
         api_key = decrypt_api_key(provider.api_key_encrypted or "")
         
-        # Test by checking endpoint connectivity
-        # For Azure OpenAI, we can perform a simple check or try listing deployments
-        # We hit endpoint / openai / deployments?api-version=...
-        url = f"{provider.endpoint.rstrip('/')}/openai/deployments?api-version={provider.api_version}"
-        headers = {"api-key": api_key}
+        # Determine connection test parameters based on type
+        if provider.provider_type in ("openai", "openai_compatible"):
+            url = f"{provider.endpoint.rstrip('/')}/models"
+            headers = {"Authorization": f"Bearer {api_key}"}
+        else:
+            # Azure OpenAI
+            url = f"{provider.endpoint.rstrip('/')}/openai/deployments?api-version={provider.api_version}"
+            headers = {"api-key": api_key}
         
         start_time = time.perf_counter()
         try:

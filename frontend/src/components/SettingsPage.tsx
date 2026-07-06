@@ -479,6 +479,7 @@ export default function SettingsPage() {
                     className="w-full bg-zinc-950 border border-zinc-800 text-zinc-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500 font-sans cursor-pointer"
                   >
                     <option value="azure_openai">Azure OpenAI</option>
+                    <option value="openai_compatible">OpenAI Compatible (Standard)</option>
                   </select>
                 </div>
                 <div>
