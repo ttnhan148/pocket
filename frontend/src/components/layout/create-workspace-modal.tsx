@@ -19,6 +19,7 @@ export default function CreateWorkspaceModal() {
       setShowCreateModal(false);
       setNewWsName("");
       setNewWsDesc("");
+      alert(`Workspace "${newWs.name}" has been created successfully!`);
     },
   });
 
